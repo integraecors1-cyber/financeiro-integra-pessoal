@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-serif: var(--font-serif);
+  --font-body: var(--font-body);
+}
+
+:root {
+  --gold: #C9A96E;
+  --gold-light: #E2C99A;
+  --gold-dark: #A07840;
+  --black: #0E0E0E;
+  --dark: #1A1A1A;
+  --surface: #242424;
+  --surface2: #2E2E2E;
+  --border: #383838;
+  --text: #F0EDE8;
+  --text-muted: #8A8580;
+  --red-light: #E07070;
+  --green-light: #7ABF8A;
+}
+
+body {
+  background-color: var(--black);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+}
+
+h1, h2, h3, .font-serif {
+  font-family: var(--font-serif), serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--black);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-dark);
+}
+
+.btn {
+  @apply px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 cursor-pointer flex items-center justify-center gap-2;
+}
+
+.btn-primary {
+  @apply bg-[#C9A96E] text-[#0E0E0E] hover:bg-[#E2C99A] active:scale-95;
+}
+
+.btn-ghost {
+  @apply bg-transparent border border-[#383838] text-[#8A8580] hover:border-[#C9A96E] hover:text-[#C9A96E];
+}
+
+.btn-danger {
+  @apply bg-[#E07070]/20 text-[#E07070] border border-[#E07070]/30 hover:bg-[#E07070] hover:text-white;
+}
+
+.card {
+  @apply bg-[#1A1A1A] border border-[#383838] rounded-xl p-6 shadow-xl;
+}
+
+.input-field {
+  @apply w-full bg-[#242424] border border-[#383838] rounded-lg px-4 py-3 text-[#F0EDE8] outline-none focus:border-[#C9A96E] transition-all;
+}
+
+.label {
+  @apply block text-[10px] uppercase tracking-widest text-[#8A8580] font-bold mb-2;
+}
+
+.table-container {
+  @apply w-full overflow-x-auto;
+}
+
+table {
+  @apply w-full border-collapse;
+}
+
+th {
+  @apply text-left py-4 px-4 text-[11px] uppercase tracking-wider text-[#8A8580] font-bold border-b border-[#383838];
+}
+
+td {
+  @apply py-4 px-4 text-sm border-b border-[#383838] align-middle;
+}
+
+tr:last-child td {
+  @apply border-b-0;
+}
+
+.badge {
+  @apply px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider;
+}
+
+.badge-gold { @apply bg-[#C9A96E]/20 text-[#C9A96E]; }
+.badge-green { @apply bg-[#7ABF8A]/20 text-[#7ABF8A]; }
+.badge-red { @apply bg-[#E07070]/20 text-[#E07070]; }
+.badge-blue { @apply bg-blue-500/20 text-blue-400; }
