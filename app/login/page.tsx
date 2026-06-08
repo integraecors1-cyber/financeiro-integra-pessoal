@@ -2,57 +2,40 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Mail, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
 
   const FOTO_ESCRITORIO = "https://daasnwnaieadvbiqpazy.supabase.co/storage/v1/object/public/assets/DSC08643.jpg";
   const LOGO = "https://daasnwnaieadvbiqpazy.supabase.co/storage/v1/object/public/assets/Integra%202.png?v=2";
 
   const handleLogin = async () => {
-    if (!email.trim()) {
-      setError('Por favor, informe seu e-mail.');
+    if (!email.trim() || !password) {
+      setError('Preencha e-mail e senha.');
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    try {
-      const accessClosed = process.env.NEXT_PUBLIC_ACCESS_CLOSED === 'true';
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          // Quando acesso fechado, não cria novos usuários
-          shouldCreateUser: accessClosed ? false : true,
-        },
-      });
-
-      if (error) {
-        if (
-          error.message.includes('Signups not allowed') ||
-          error.message.includes('User not found') ||
-          error.status === 400
-        ) {
-          setError('Este e-mail não está autorizado. O acesso ao sistema foi encerrado para novos usuários.');
-        } else {
-          setError(error.message);
-        }
-        return;
-      }
-
-      setSent(true);
-    } catch (err: any) {
-      setError('Erro ao enviar o link de acesso. Tente novamente.');
-    } finally {
+    if (error) {
+      // Mensagem genérica — não revela se o e-mail existe ou não
+      setError('E-mail ou senha incorretos.');
       setLoading(false);
+      return;
     }
+
+    // Supabase atualiza a sessão — middleware redireciona para /
   };
 
   return (
@@ -71,9 +54,8 @@ export default function LoginPage() {
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: '24px',
-          padding: '36px 40px 36px 40px',
+          padding: '36px 40px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.4)',
-          gap: '0',
         }}
       >
         <img
@@ -89,66 +71,62 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex items-start gap-3 text-left mb-6">
-            <AlertCircle className="text-red-400 shrink-0" size={18} />
+          <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex items-start gap-3 text-left mb-4">
+            <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} />
             <p className="text-red-400 text-xs font-medium leading-relaxed">{error}</p>
           </div>
         )}
 
-        {sent ? (
-          <div className="w-full flex flex-col items-center gap-4">
-            <div className="w-full bg-green-500/10 border border-green-500/30 p-5 rounded-xl flex flex-col items-center gap-3 text-center">
-              <CheckCircle className="text-green-400" size={32} />
-              <p className="text-white text-sm font-medium leading-relaxed">
-                Link de acesso enviado!
-              </p>
-              <p className="text-white/60 text-xs leading-relaxed">
-                Verifique sua caixa de entrada em{' '}
-                <span className="text-white/80 font-semibold">{email}</span>{' '}
-                e clique no link para entrar.
-              </p>
-            </div>
+        {/* E-mail */}
+        <div className="w-full mb-3">
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(null); }}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="seu@email.com"
+              autoComplete="email"
+              className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl py-4 pl-11 pr-4 text-sm focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Senha */}
+        <div className="w-full mb-5">
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(null); }}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="senha"
+              autoComplete="current-password"
+              className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl py-4 pl-11 pr-12 text-sm focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
+            />
             <button
-              onClick={() => { setSent(false); setEmail(''); }}
-              className="text-white/40 hover:text-white/70 text-xs transition-colors"
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
             >
-              Usar outro e-mail
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-        ) : (
-          <>
-            <div className="w-full mb-4">
-              <div className="relative">
-                <Mail
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40"
-                  size={16}
-                />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                  placeholder="seu@email.com"
-                  autoComplete="email"
-                  className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl py-4 pl-11 pr-4 text-sm focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
-                />
-              </div>
-            </div>
+        </div>
 
-            <button
-              onClick={handleLogin}
-              disabled={loading}
-              style={{ width: '100%', marginBottom: '20px' }}
-              className="flex items-center justify-center gap-3 bg-white hover:bg-white/90 text-gray-800 font-bold py-4 px-6 rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <span className="uppercase tracking-widest text-xs">Enviar link de acesso</span>
-              )}
-            </button>
-          </>
-        )}
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-white/90 text-gray-800 font-bold py-4 px-6 rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 mb-5"
+        >
+          {loading ? (
+            <Loader2 className="animate-spin" size={20} />
+          ) : (
+            <span className="uppercase tracking-widest text-xs">Entrar</span>
+          )}
+        </button>
 
         <div
           style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}
