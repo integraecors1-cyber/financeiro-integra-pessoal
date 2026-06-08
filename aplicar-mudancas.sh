@@ -1,3 +1,15 @@
+#!/bin/bash
+# =============================================================
+#  Script de migração: Google OAuth → Magic Link (e-mail)
+#  Cole e execute no terminal do seu Codespace na raiz do projeto
+# =============================================================
+
+set -e  # Para se qualquer comando falhar
+
+echo "🔄 Aplicando mudanças no sistema de login..."
+
+# ── 1. app/login/page.tsx ─────────────────────────────────────
+cat > app/login/page.tsx << 'ENDOFFILE'
 'use client';
 
 import React, { useState } from 'react';
@@ -160,3 +172,113 @@ export default function LoginPage() {
     </div>
   );
 }
+ENDOFFILE
+
+echo "✅ app/login/page.tsx atualizado"
+
+# ── 2. app/auth/callback/route.ts ─────────────────────────────
+cat > app/auth/callback/route.ts << 'ENDOFFILE'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
+
+export async function GET(request: NextRequest) {
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const token_hash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
+
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.delete({ name, ...options })
+        },
+      },
+    }
+  )
+
+  // Magic link (OTP) — token_hash + type=email
+  if (token_hash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any })
+    if (!error) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+  }
+
+  // OAuth code exchange (compatibilidade com fluxo anterior)
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      return new NextResponse(
+        `<html>
+           <body>
+             <script>
+               if (window.opener) {
+                 window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
+                 window.close();
+               } else {
+                 window.location.href = '${origin}';
+               }
+             </script>
+             <p>Autenticação bem-sucedida. Esta janela fechará automaticamente.</p>
+           </body>
+         </html>`,
+        { headers: { 'Content-Type': 'text/html' } }
+      )
+    }
+  }
+
+  return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+}
+ENDOFFILE
+
+echo "✅ app/auth/callback/route.ts atualizado"
+
+# ── 3. Adiciona variável ao .env.example (se ainda não existir) ─
+if ! grep -q "NEXT_PUBLIC_ACCESS_CLOSED" .env.example 2>/dev/null; then
+  cat >> .env.example << 'ENDOFFILE'
+
+# ACCESS_CLOSED: Quando 'true', bloqueia novos cadastros.
+# Somente usuários já existentes no Supabase conseguem receber o magic link.
+# Para fechar o acesso: defina como true e faça redeploy.
+NEXT_PUBLIC_ACCESS_CLOSED=false
+ENDOFFILE
+  echo "✅ .env.example atualizado com NEXT_PUBLIC_ACCESS_CLOSED"
+else
+  echo "ℹ️  NEXT_PUBLIC_ACCESS_CLOSED já existe no .env.example, pulando"
+fi
+
+# ── 4. Adiciona ao .env.local se existir ──────────────────────
+if [ -f .env.local ] && ! grep -q "NEXT_PUBLIC_ACCESS_CLOSED" .env.local; then
+  echo "" >> .env.local
+  echo "NEXT_PUBLIC_ACCESS_CLOSED=false" >> .env.local
+  echo "✅ .env.local atualizado com NEXT_PUBLIC_ACCESS_CLOSED=false"
+fi
+
+echo ""
+echo "✅ Todas as mudanças aplicadas com sucesso!"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Próximos passos:"
+echo ""
+echo "  1. Teste localmente:   npm run dev"
+echo ""
+echo "  2. Para fechar acesso a novos usuários após todos entrarem:"
+echo "     - Defina NEXT_PUBLIC_ACCESS_CLOSED=true no seu .env / painel de deploy"
+echo "     - Faça redeploy"
+echo ""
+echo "  3. (Recomendado) No Supabase Dashboard:"
+echo "     Authentication → Settings → desative 'Enable new user signups'"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
