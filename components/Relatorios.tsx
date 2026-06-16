@@ -151,6 +151,8 @@ export default function Relatorios({ finance }: any) {
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
+        allowTaint: false,
+        imageTimeout: 0,
         backgroundColor: '#0E0E0E',
         width: element.scrollWidth,
         height: element.scrollHeight,
@@ -158,12 +160,17 @@ export default function Relatorios({ finance }: any) {
         scrollX: 0,
         scrollY: 0,
         logging: false,
-        onclone: (clonedDoc) => {
-          const clonedEl = clonedDoc.getElementById('report-container');
-          if (clonedEl) {
-            clonedEl.style.width = '900px';
-            clonedEl.style.maxWidth = '900px';
-          }
+        onclone: (_clonedDoc, clonedEl) => {
+          clonedEl.style.width = '900px';
+          clonedEl.style.maxWidth = '900px';
+          // Substitui imagens externas por texto para evitar erro de CORS
+          const imgs = clonedEl.querySelectorAll('img');
+          imgs.forEach((img: HTMLImageElement) => {
+            const span = _clonedDoc.createElement('span');
+            span.textContent = img.alt || 'Integra&Co';
+            span.style.cssText = 'font-size:20px;font-weight:bold;color:#C9A96E;font-family:serif;display:block;';
+            img.replaceWith(span);
+          });
         }
       });
 
