@@ -139,55 +139,74 @@ export default function Relatorios({ finance }: any) {
   }, [finance, filtros, activeTab]);
 
   const generatePDF = async () => {
-    setIsGenerating(true);
     if (!reportRef.current) return;
-    
-    // Suaviza a espera para garantir carregamento de fontes e estilos
-    setTimeout(async () => {
-      try {
-        const canvas = await html2canvas(reportRef.current!, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#0E0E0E',
-          width: 900,
-          windowWidth: 900,
-          scrollX: 0,
-          scrollY: 0,
-          logging: false
-        });
-        
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = pdfWidth / imgWidth;
-        const pageHeightMM = pdfHeight / ratio; // Height of one A4 page in canvas pixels relative to imgWidth
+    setIsGenerating(true);
 
-        let heightLeft = imgHeight;
-        let position = 0;
+    // Aguarda a renderização completa antes de capturar
+    await new Promise(resolve => setTimeout(resolve, 800));
 
-        // First Page
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight * ratio);
-        heightLeft -= pageHeightMM;
+    try {
+      const element = reportRef.current;
 
-        // Subsequent Pages
-        while (heightLeft > 0) {
-          position = - (imgHeight - heightLeft) * ratio;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight * ratio);
-          heightLeft -= pageHeightMM;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#0E0E0E',
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+        windowWidth: element.scrollWidth,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false,
+        onclone: (clonedDoc) => {
+          const clonedEl = clonedDoc.getElementById('report-container');
+          if (clonedEl) {
+            clonedEl.style.width = '900px';
+            clonedEl.style.maxWidth = '900px';
+          }
         }
+      });
 
-        pdf.save(`Relatorio-${activeTab}-${filtros.ano}-${filtros.mes}.pdf`);
-      } catch (e) {
-        console.error('PDF Error:', e);
-      } finally {
-        setIsGenerating(false);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();   // 210mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+
+      // canvas.width/height já inclui o scale:2; calculamos em mm
+      const imgWidthPx  = canvas.width;
+      const imgHeightPx = canvas.height;
+
+      // mm por pixel (considerando scale:2)
+      const mmPerPx = pdfWidth / imgWidthPx;
+
+      // Altura total do conteúdo em mm
+      const totalHeightMM = imgHeightPx * mmPerPx;
+
+      // Quantos pixels cabem em uma página A4
+      const pageHeightPx = pdfHeight / mmPerPx;
+
+      let heightRenderedPx = 0;
+      let isFirstPage = true;
+
+      while (heightRenderedPx < imgHeightPx) {
+        if (!isFirstPage) pdf.addPage();
+        isFirstPage = false;
+
+        // Offset vertical negativo para "rolar" o canvas para a página certa
+        const yOffsetMM = -(heightRenderedPx * mmPerPx);
+
+        pdf.addImage(imgData, 'PNG', 0, yOffsetMM, pdfWidth, totalHeightMM);
+        heightRenderedPx += pageHeightPx;
       }
-    }, 1200);
+
+      const mesLabel = activeTab === 'anual' ? 'anual' : filtros.mes;
+      pdf.save(`Relatorio-${activeTab}-${filtros.ano}-${mesLabel}.pdf`);
+    } catch (e) {
+      console.error('PDF Error:', e);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
