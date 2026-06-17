@@ -142,75 +142,51 @@ export default function Relatorios({ finance }: any) {
     if (!reportRef.current) return;
     setIsGenerating(true);
 
-    // Aguarda a renderização completa antes de capturar
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Aguarda estabilização do DOM antes de capturar
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
-      const element = reportRef.current;
-
-      const canvas = await html2canvas(element, {
+      const canvas = await html2canvas(reportRef.current, {
         scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        imageTimeout: 0,
+        useCORS: false,
+        allowTaint: true,
         backgroundColor: '#0E0E0E',
-        width: element.scrollWidth,
-        height: element.scrollHeight,
-        windowWidth: element.scrollWidth,
+        width: reportRef.current.scrollWidth,
+        height: reportRef.current.scrollHeight,
+        windowWidth: reportRef.current.scrollWidth,
         scrollX: 0,
         scrollY: 0,
         logging: false,
-        onclone: (_clonedDoc, clonedEl) => {
-          clonedEl.style.width = '900px';
-          clonedEl.style.maxWidth = '900px';
-          // Substitui imagens externas por texto para evitar erro de CORS
-          const imgs = clonedEl.querySelectorAll('img');
-          imgs.forEach((img: HTMLImageElement) => {
-            const span = _clonedDoc.createElement('span');
-            span.textContent = img.alt || 'Integra&Co';
-            span.style.cssText = 'font-size:20px;font-weight:bold;color:#C9A96E;font-family:serif;display:block;';
-            img.replaceWith(span);
-          });
-        }
+        // Ignora elementos <img> externos que causam SecurityError no canvas
+        ignoreElements: (el) => el.tagName === 'IMG',
       });
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();   // 210mm
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+      const pdfWidth  = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // canvas.width/height já inclui o scale:2; calculamos em mm
-      const imgWidthPx  = canvas.width;
-      const imgHeightPx = canvas.height;
-
-      // mm por pixel (considerando scale:2)
-      const mmPerPx = pdfWidth / imgWidthPx;
-
-      // Altura total do conteúdo em mm
-      const totalHeightMM = imgHeightPx * mmPerPx;
-
-      // Quantos pixels cabem em uma página A4
+      const canvasWidth  = canvas.width;
+      const canvasHeight = canvas.height;
+      const mmPerPx      = pdfWidth / canvasWidth;
+      const totalMM      = canvasHeight * mmPerPx;
       const pageHeightPx = pdfHeight / mmPerPx;
 
-      let heightRenderedPx = 0;
-      let isFirstPage = true;
+      let rendered = 0;
+      let firstPage = true;
 
-      while (heightRenderedPx < imgHeightPx) {
-        if (!isFirstPage) pdf.addPage();
-        isFirstPage = false;
-
-        // Offset vertical negativo para "rolar" o canvas para a página certa
-        const yOffsetMM = -(heightRenderedPx * mmPerPx);
-
-        pdf.addImage(imgData, 'PNG', 0, yOffsetMM, pdfWidth, totalHeightMM);
-        heightRenderedPx += pageHeightPx;
+      while (rendered < canvasHeight) {
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+        pdf.addImage(imgData, 'PNG', 0, -(rendered * mmPerPx), pdfWidth, totalMM);
+        rendered += pageHeightPx;
       }
 
       const mesLabel = activeTab === 'anual' ? 'anual' : filtros.mes;
       pdf.save(`Relatorio-${activeTab}-${filtros.ano}-${mesLabel}.pdf`);
     } catch (e) {
       console.error('PDF Error:', e);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      alert('Erro ao gerar PDF. Verifique o console para detalhes.');
     } finally {
       setIsGenerating(false);
     }
@@ -291,13 +267,10 @@ export default function Relatorios({ finance }: any) {
         {/* Header */}
         <div className="flex justify-between items-start border-b-2 border-gold pb-10">
           <div className="flex items-center gap-3">
-            <img
-              src="https://daasnwnaieadvbiqpazy.supabase.co/storage/v1/object/public/assets/Integra%202.png"
-              alt="Integra&Co"
-              width={160}
-              height={48}
-              style={{ objectFit: 'contain' }}
-            />
+            <svg width="160" height="48" viewBox="0 0 160 48" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="34" fontFamily="Georgia, serif" fontSize="28" fontWeight="bold" fill="#C9A96E" letterSpacing="1">Integra</text>
+              <text x="108" y="34" fontFamily="Georgia, serif" fontSize="28" fontWeight="bold" fill="#F0EDE8">&amp;Co</text>
+            </svg>
           </div>
           <div className="text-right">
             <p className="text-[11px] font-bold text-gold uppercase mb-1">RELATÓRIO FINANCEIRO</p>
