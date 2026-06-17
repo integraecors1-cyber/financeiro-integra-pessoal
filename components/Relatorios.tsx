@@ -157,8 +157,28 @@ export default function Relatorios({ finance }: any) {
         scrollX: 0,
         scrollY: 0,
         logging: false,
-        // Ignora elementos <img> externos que causam SecurityError no canvas
         ignoreElements: (el) => el.tagName === 'IMG',
+        onclone: (_doc, el) => {
+          // html2canvas 1.4.1 não suporta oklab (usado pelo Tailwind v4).
+          // Força todas as cores computadas para hex antes da captura.
+          const all = el.querySelectorAll('*') as NodeListOf<HTMLElement>;
+          const props = ['color', 'background-color', 'border-color', 'border-top-color', 'border-bottom-color', 'border-left-color', 'border-right-color'];
+          all.forEach((node) => {
+            const cs = window.getComputedStyle(node);
+            props.forEach((prop) => {
+              const val = cs.getPropertyValue(prop);
+              if (val && val.includes('oklab')) {
+                // Cria canvas temporário para resolver a cor via browser
+                const tmp = document.createElement('canvas');
+                tmp.width = tmp.height = 1;
+                const ctx = tmp.getContext('2d')!;
+                ctx.fillStyle = val;
+                const hex = ctx.fillStyle; // browser converte para hex
+                (node.style as any)[prop.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase())] = hex;
+              }
+            });
+          });
+        },
       });
 
       const imgData = canvas.toDataURL('image/png');
