@@ -145,6 +145,7 @@ export default function Relatorios({ finance }: any) {
     // Aguarda estabilização do DOM antes de capturar
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    try {
       // html2canvas 1.4.1 não suporta oklab (Tailwind v4).
       // Resolve todas as cores computadas para rgb/hex inline antes de capturar.
       const colorProps: (keyof CSSStyleDeclaration)[] = [
