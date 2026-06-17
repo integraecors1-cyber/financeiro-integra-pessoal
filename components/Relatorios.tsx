@@ -145,7 +145,34 @@ export default function Relatorios({ finance }: any) {
     // Aguarda estabilização do DOM antes de capturar
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    try {
+      // html2canvas 1.4.1 não suporta oklab (Tailwind v4).
+      // Resolve todas as cores computadas para rgb/hex inline antes de capturar.
+      const colorProps: (keyof CSSStyleDeclaration)[] = [
+        'color', 'backgroundColor', 'borderTopColor', 'borderBottomColor',
+        'borderLeftColor', 'borderRightColor', 'outlineColor', 'boxShadow'
+      ];
+      const allNodes = Array.from(reportRef.current.querySelectorAll('*')) as HTMLElement[];
+      const overrides: Array<{ el: HTMLElement; prop: keyof CSSStyleDeclaration; prev: string }> = [];
+
+      // Canvas auxiliar para conversão de cor
+      const colorCanvas = document.createElement('canvas');
+      colorCanvas.width = colorCanvas.height = 1;
+      const colorCtx = colorCanvas.getContext('2d')!;
+
+      allNodes.forEach((node) => {
+        const cs = window.getComputedStyle(node);
+        colorProps.forEach((prop) => {
+          const val = cs[prop] as string;
+          if (val && val.includes('oklab')) {
+            colorCtx.fillStyle = '#000';
+            colorCtx.fillStyle = val;      // browser resolve oklab → sRGB
+            const resolved = colorCtx.fillStyle; // retorna hex
+            overrides.push({ el: node, prop, prev: (node.style[prop] as string) });
+            (node.style[prop] as any) = resolved;
+          }
+        });
+      });
+
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: false,
@@ -158,28 +185,10 @@ export default function Relatorios({ finance }: any) {
         scrollY: 0,
         logging: false,
         ignoreElements: (el) => el.tagName === 'IMG',
-        onclone: (_doc, el) => {
-          // html2canvas 1.4.1 não suporta oklab (usado pelo Tailwind v4).
-          // Força todas as cores computadas para hex antes da captura.
-          const all = el.querySelectorAll('*') as NodeListOf<HTMLElement>;
-          const props = ['color', 'background-color', 'border-color', 'border-top-color', 'border-bottom-color', 'border-left-color', 'border-right-color'];
-          all.forEach((node) => {
-            const cs = window.getComputedStyle(node);
-            props.forEach((prop) => {
-              const val = cs.getPropertyValue(prop);
-              if (val && val.includes('oklab')) {
-                // Cria canvas temporário para resolver a cor via browser
-                const tmp = document.createElement('canvas');
-                tmp.width = tmp.height = 1;
-                const ctx = tmp.getContext('2d')!;
-                ctx.fillStyle = val;
-                const hex = ctx.fillStyle; // browser converte para hex
-                (node.style as any)[prop.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase())] = hex;
-              }
-            });
-          });
-        },
       });
+
+      // Restaura estilos originais após captura
+      overrides.forEach(({ el, prop, prev }) => { (el.style[prop] as any) = prev; });
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
