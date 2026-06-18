@@ -165,10 +165,14 @@ export default function Relatorios({ finance }: any) {
         },
       };
 
+      // Ativa modo impressão (fundo branco, textos escuros)
+      el.classList.add('print-mode');
       // Primeira chamada: aquece cache de fontes/recursos
       await toPng(el, toPngOptions);
       // Segunda chamada: captura final com tudo carregado
       const dataUrl = await toPng(el, toPngOptions);
+      // Remove modo impressão para restaurar UI
+      el.classList.remove('print-mode');
 
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
       pdf.setFillColor(255, 255, 255);
@@ -196,6 +200,7 @@ export default function Relatorios({ finance }: any) {
       const mesLabel = activeTab === 'anual' ? 'anual' : filtros.mes;
       pdf.save(`Relatorio-${activeTab}-${filtros.ano}-${mesLabel}.pdf`);
     } catch (e) {
+      reportRef.current?.classList.remove('print-mode');
       console.error('PDF Error:', e);
       alert('Erro ao gerar PDF. Verifique o console para detalhes.');
     } finally {
@@ -250,11 +255,8 @@ export default function Relatorios({ finance }: any) {
           boxSizing: 'border-box'
         }}
       >
-        {/* Anti-oklab styles para o PDF */}
+        {/* Estilos base + modo impressão (print-mode) */}
         <style dangerouslySetInnerHTML={{ __html: `
-          #report-container { 
-            color-scheme: dark;
-          }
           #report-container * { 
             color-interpolation-filters: sRGB !important; 
             box-sizing: border-box !important;
@@ -271,8 +273,46 @@ export default function Relatorios({ finance }: any) {
           }
           .text-gold { color: #C9A96E !important; }
           .bg-gold { background-color: #C9A96E !important; }
-          .text-[#7ABF8A] { color: #7ABF8A !important; }
-          .text-[#E07070] { color: #E07070 !important; }
+          .text-[\#7ABF8A] { color: #7ABF8A !important; }
+          .text-[\#E07070] { color: #E07070 !important; }
+
+          /* === MODO IMPRESSÃO: fundo branco, textos escuros === */
+          #report-container.print-mode {
+            background-color: #FFFFFF !important;
+            color: #1A1A1A !important;
+          }
+          #report-container.print-mode * {
+            color: inherit;
+          }
+          /* Containers escuros → branco */
+          #report-container.print-mode .bg-\[\#141414\],
+          #report-container.print-mode .bg-\[\#0E0E0E\],
+          #report-container.print-mode .bg-\[\#1A1A1A\] {
+            background-color: #FFFFFF !important;
+          }
+          /* Bordas escuras → cinza claro */
+          #report-container.print-mode .border-\[\#242424\],
+          #report-container.print-mode .divide-\[\#242424\] > * {
+            border-color: #D1D5DB !important;
+          }
+          /* Textos brancos e cinzas claros → escuro */
+          #report-container.print-mode .text-white,
+          #report-container.print-mode .text-\[\#F0EDE8\] {
+            color: #1A1A1A !important;
+          }
+          #report-container.print-mode .text-\[\#8A8580\],
+          #report-container.print-mode .text-\[\#5A5650\] {
+            color: #6B7280 !important;
+          }
+          /* Cores de destaque mantidas */
+          #report-container.print-mode .text-gold,
+          #report-container.print-mode .text-\[\#C9A96E\] { color: #92701E !important; }
+          #report-container.print-mode .text-\[\#7ABF8A\] { color: #276749 !important; }
+          #report-container.print-mode .text-\[\#E07070\] { color: #B91C1C !important; }
+          /* Header SVG logo */
+          #report-container.print-mode svg text[fill="\#F0EDE8"] { fill: #1A1A1A !important; }
+          /* Linha divisória do header */
+          #report-container.print-mode .border-gold { border-color: #C9A96E !important; }
         `}} />
 
         {/* Header */}
