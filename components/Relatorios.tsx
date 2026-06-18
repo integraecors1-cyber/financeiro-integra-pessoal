@@ -165,14 +165,48 @@ export default function Relatorios({ finance }: any) {
         },
       };
 
-      // Ativa modo impressão (fundo branco, textos escuros)
-      el.classList.add('print-mode');
+      // Modo impressão: coleta todos os elementos e força estilos para fundo branco
+      type Override = { el: HTMLElement; bg: string; color: string; border: string };
+      const overrides: Override[] = [];
+
+      const darkBgs = ['#141414','#0e0e0e','#1a1a1a','rgb(20,20,20)','rgb(14,14,14)','rgb(26,26,26)'];
+      const lightTexts = ['#f0ede8','#ffffff','rgb(240,237,232)','rgb(255,255,255)'];
+      const darkBorders = ['#242424','rgb(36,36,36)'];
+
+      Array.from(el.querySelectorAll<HTMLElement>('*')).forEach(node => {
+        const cs = window.getComputedStyle(node);
+        const bg = cs.backgroundColor.toLowerCase();
+        const col = cs.color.toLowerCase();
+        const border = cs.borderColor.toLowerCase();
+
+        const bgDark = darkBgs.some(d => bg.replace(/\s/g,'').includes(d.replace(/\s/g,'')));
+        const colLight = lightTexts.some(d => col.replace(/\s/g,'').includes(d.replace(/\s/g,'')));
+        const borderDark = darkBorders.some(d => border.replace(/\s/g,'').includes(d.replace(/\s/g,'')));
+
+        if (bgDark || colLight || borderDark) {
+          overrides.push({ el: node, bg: node.style.backgroundColor, color: node.style.color, border: node.style.borderColor });
+          if (bgDark) node.style.backgroundColor = '#ffffff';
+          if (colLight) node.style.color = '#1a1a1a';
+          if (borderDark) node.style.borderColor = '#d1d5db';
+        }
+      });
+
+      // Força o container raiz também
+      const prevBg = el.style.backgroundColor;
+      el.style.backgroundColor = '#ffffff';
+
       // Primeira chamada: aquece cache de fontes/recursos
       await toPng(el, toPngOptions);
-      // Segunda chamada: captura final com tudo carregado
+      // Segunda chamada: captura final
       const dataUrl = await toPng(el, toPngOptions);
-      // Remove modo impressão para restaurar UI
-      el.classList.remove('print-mode');
+
+      // Restaura estilos originais
+      el.style.backgroundColor = prevBg;
+      overrides.forEach(o => {
+        o.el.style.backgroundColor = o.bg;
+        o.el.style.color = o.color;
+        o.el.style.borderColor = o.border;
+      });
 
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
       pdf.setFillColor(255, 255, 255);
