@@ -41,7 +41,4 @@
     "tw-animate-css": "^1.4.0",
     "typescript": "5.9.3"
   }
-}npm install
-git add components/Relatorios.tsx package.json package-lock.json
-git commit -m "fix: substitui html2canvas por html-to-image para suporte ao Tailwind v4 (oklab)"
-git push
+}
