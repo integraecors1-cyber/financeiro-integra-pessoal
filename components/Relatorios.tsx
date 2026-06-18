@@ -149,20 +149,29 @@ export default function Relatorios({ finance }: any) {
       const width = el.scrollWidth;
       const height = el.scrollHeight;
 
-      // toPng do html-to-image suporta CSS moderno (oklab, variáveis, etc.)
-      // Chamamos duas vezes: a primeira execução carrega fontes/recursos,
-      // a segunda garante render completo (comportamento recomendado pela lib).
-      await toPng(el, { width, height, pixelRatio: 2, skipFonts: false });
-      const dataUrl = await toPng(el, {
+      // Opções de captura: fundo branco para impressão em papel A4
+      const toPngOptions = {
         width,
         height,
         pixelRatio: 2,
         skipFonts: false,
-        filter: (node) => node.tagName !== 'IMG', // ignora imagens externas
-        style: { overflow: 'visible' },
-      });
+        filter: (node: HTMLElement) => node.tagName !== 'IMG',
+        backgroundColor: '#FFFFFF',
+        style: {
+          overflow:        'visible',
+          background:      '#FFFFFF',
+          backgroundColor: '#FFFFFF',
+          color:           '#1A1A1A',
+        },
+      };
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      // Primeira chamada: aquece cache de fontes/recursos
+      await toPng(el, toPngOptions);
+      // Segunda chamada: captura final com tudo carregado
+      const dataUrl = await toPng(el, toPngOptions);
+
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+      pdf.setFillColor(255, 255, 255);
       const pdfWidth  = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
@@ -177,6 +186,9 @@ export default function Relatorios({ finance }: any) {
       while (rendered < imgHeightMM) {
         if (!firstPage) pdf.addPage();
         firstPage = false;
+        // Fundo branco em cada página antes de inserir a imagem
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
         pdf.addImage(dataUrl, 'PNG', 0, -rendered, imgWidthMM, imgHeightMM);
         rendered += pageHeightMM;
       }
