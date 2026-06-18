@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { FileText, Download, User, Users, TrendingUp, AlertCircle, Scale, Receipt, CheckCircle2, ArrowUpRight, ArrowDownLeft, Printer, Briefcase } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { fmt, fmtDate } from '@/lib/utils';
 import { MEMBROS, MESES } from '@/lib/constants';
@@ -142,74 +142,43 @@ export default function Relatorios({ finance }: any) {
     if (!reportRef.current) return;
     setIsGenerating(true);
 
-    // Aguarda estabilização do DOM antes de capturar
     await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
-      // html2canvas 1.4.1 não suporta oklab (Tailwind v4).
-      // Resolve todas as cores computadas para rgb/hex inline antes de capturar.
-      const colorProps: (keyof CSSStyleDeclaration)[] = [
-        'color', 'backgroundColor', 'borderTopColor', 'borderBottomColor',
-        'borderLeftColor', 'borderRightColor', 'outlineColor', 'boxShadow'
-      ];
-      const allNodes = Array.from(reportRef.current.querySelectorAll('*')) as HTMLElement[];
-      const overrides: Array<{ el: HTMLElement; prop: keyof CSSStyleDeclaration; prev: string }> = [];
+      const el = reportRef.current;
+      const width = el.scrollWidth;
+      const height = el.scrollHeight;
 
-      // Canvas auxiliar para conversão de cor
-      const colorCanvas = document.createElement('canvas');
-      colorCanvas.width = colorCanvas.height = 1;
-      const colorCtx = colorCanvas.getContext('2d')!;
-
-      allNodes.forEach((node) => {
-        const cs = window.getComputedStyle(node);
-        colorProps.forEach((prop) => {
-          const val = cs[prop] as string;
-          if (val && val.includes('oklab')) {
-            colorCtx.fillStyle = '#000';
-            colorCtx.fillStyle = val;      // browser resolve oklab → sRGB
-            const resolved = colorCtx.fillStyle; // retorna hex
-            overrides.push({ el: node, prop, prev: (node.style[prop] as string) });
-            (node.style[prop] as any) = resolved;
-          }
-        });
+      // toPng do html-to-image suporta CSS moderno (oklab, variáveis, etc.)
+      // Chamamos duas vezes: a primeira execução carrega fontes/recursos,
+      // a segunda garante render completo (comportamento recomendado pela lib).
+      await toPng(el, { width, height, pixelRatio: 2, skipFonts: false });
+      const dataUrl = await toPng(el, {
+        width,
+        height,
+        pixelRatio: 2,
+        skipFonts: false,
+        filter: (node) => node.tagName !== 'IMG', // ignora imagens externas
+        style: { overflow: 'visible' },
       });
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: false,
-        allowTaint: true,
-        backgroundColor: '#0E0E0E',
-        width: reportRef.current.scrollWidth,
-        height: reportRef.current.scrollHeight,
-        windowWidth: reportRef.current.scrollWidth,
-        scrollX: 0,
-        scrollY: 0,
-        logging: false,
-        ignoreElements: (el) => el.tagName === 'IMG',
-      });
-
-      // Restaura estilos originais após captura
-      overrides.forEach(({ el, prop, prev }) => { (el.style[prop] as any) = prev; });
-
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth  = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      const canvasWidth  = canvas.width;
-      const canvasHeight = canvas.height;
-      const mmPerPx      = pdfWidth / canvasWidth;
-      const totalMM      = canvasHeight * mmPerPx;
-      const pageHeightPx = pdfHeight / mmPerPx;
+      // Dimensões da imagem em mm
+      const imgWidthMM  = pdfWidth;
+      const imgHeightMM = (height / width) * pdfWidth * 2; // pixelRatio:2
 
+      const pageHeightMM = pdfHeight;
       let rendered = 0;
       let firstPage = true;
 
-      while (rendered < canvasHeight) {
+      while (rendered < imgHeightMM) {
         if (!firstPage) pdf.addPage();
         firstPage = false;
-        pdf.addImage(imgData, 'PNG', 0, -(rendered * mmPerPx), pdfWidth, totalMM);
-        rendered += pageHeightPx;
+        pdf.addImage(dataUrl, 'PNG', 0, -rendered, imgWidthMM, imgHeightMM);
+        rendered += pageHeightMM;
       }
 
       const mesLabel = activeTab === 'anual' ? 'anual' : filtros.mes;
